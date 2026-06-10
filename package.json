@@ -1,0 +1,20 @@
+{
+  "name": "null-gate",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Null Gate - a one-shot generated first-person sci-fi portal puzzle game (LLM coding benchmark project)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.170.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.0"
+  }
+}

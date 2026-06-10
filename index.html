@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NULL GATE — Spatial Aperture Testing Initiative</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cellipse cx='16' cy='16' rx='9' ry='13' fill='none' stroke='%233ce0ff' stroke-width='3'/%3E%3C/svg%3E" />
+  <style>
+    :root {
+      --cyan: #3ce0ff;
+      --amber: #ffa13c;
+      --blue: #3c8cff;
+      --bg: #0b0d0f;
+      --panel: rgba(16, 20, 24, 0.88);
+      --line: rgba(120, 200, 255, 0.25);
+      --text: #cfe3ec;
+      --dim: #6f8893;
+      --mono: "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+      --disp: "Avenir Next", "Segoe UI", Futura, "Helvetica Neue", Arial, sans-serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
+    body { font-family: var(--disp); color: var(--text); user-select: none; -webkit-user-select: none; }
+    #app { position: fixed; inset: 0; }
+    #app canvas { display: block; width: 100%; height: 100%; }
+
+    /* ---------- generic overlay layers ---------- */
+    .layer { position: fixed; inset: 0; pointer-events: none; }
+
+    /* ---------- HUD ---------- */
+    #hud { opacity: 0; transition: opacity 0.4s; }
+    #hud.visible { opacity: 1; }
+
+    #crosshair {
+      position: absolute; left: 50%; top: 50%; width: 26px; height: 26px;
+      transform: translate(-50%, -50%);
+    }
+    #crosshair::before, #crosshair::after {
+      content: ""; position: absolute; background: rgba(220, 240, 250, 0.85);
+      box-shadow: 0 0 4px rgba(120, 220, 255, 0.6);
+    }
+    #crosshair::before { left: 50%; top: 4px; bottom: 4px; width: 1.5px; transform: translateX(-50%); }
+    #crosshair::after { top: 50%; left: 4px; right: 4px; height: 1.5px; transform: translateY(-50%); }
+    #crosshair .dot {
+      position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; border-radius: 50%;
+      transform: translate(-50%, -50%); background: #fff;
+    }
+
+    #portal-status {
+      position: absolute; left: 50%; top: calc(50% + 34px); transform: translateX(-50%);
+      display: flex; gap: 18px;
+    }
+    .p-ind {
+      width: 30px; height: 10px; border-radius: 5px;
+      border: 1px solid rgba(160, 200, 220, 0.35);
+      background: rgba(40, 50, 58, 0.5); transition: all 0.25s;
+    }
+    .p-ind.lit-blue { background: var(--blue); border-color: var(--blue); box-shadow: 0 0 12px var(--blue); }
+    .p-ind.lit-amber { background: var(--amber); border-color: var(--amber); box-shadow: 0 0 12px var(--amber); }
+
+    #level-tag {
+      position: absolute; top: 26px; left: 32px; font-family: var(--mono);
+      border-left: 3px solid var(--cyan); padding-left: 14px;
+    }
+    #level-tag .lv-num { font-size: 11px; letter-spacing: 4px; color: var(--dim); }
+    #level-tag .lv-name { font-size: 17px; letter-spacing: 3px; color: var(--text); margin-top: 2px; }
+    #objective {
+      position: absolute; top: 26px; right: 32px; max-width: 380px; text-align: right;
+      font-family: var(--mono); font-size: 11.5px; letter-spacing: 1.5px; line-height: 1.6;
+      color: var(--dim);
+    }
+    #objective b { color: var(--cyan); font-weight: 600; }
+
+    #prompt {
+      position: absolute; left: 50%; top: calc(50% + 70px); transform: translateX(-50%);
+      font-family: var(--mono); font-size: 12.5px; letter-spacing: 2px; color: var(--text);
+      background: var(--panel); border: 1px solid var(--line); padding: 7px 16px; border-radius: 3px;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    #prompt.visible { opacity: 1; }
+    #prompt .key {
+      display: inline-block; border: 1px solid var(--cyan); color: var(--cyan); border-radius: 3px;
+      padding: 0 6px; margin-right: 8px; font-size: 11px;
+    }
+
+    #message {
+      position: absolute; left: 50%; bottom: 18%; transform: translateX(-50%);
+      font-family: var(--mono); font-size: 13px; letter-spacing: 3px; color: var(--amber);
+      text-shadow: 0 0 12px rgba(255, 160, 60, 0.5);
+      opacity: 0; transition: opacity 0.2s;
+    }
+    #message.visible { opacity: 1; }
+
+    /* ---------- full screen fades / flashes ---------- */
+    #fade { background: #000; opacity: 1; transition: opacity 0.45s ease; }
+    #flash { opacity: 0; }
+
+    /* ---------- debug ---------- */
+    #debug {
+      position: absolute; bottom: 24px; left: 32px; display: none;
+      font-family: var(--mono); font-size: 11px; line-height: 1.7; letter-spacing: 1px;
+      color: #9fd8c8; background: rgba(8, 12, 14, 0.75); padding: 10px 14px;
+      border: 1px solid rgba(110, 220, 190, 0.25); border-radius: 3px; white-space: pre;
+    }
+    #debug.visible { display: block; }
+
+    /* ---------- controls overlay ---------- */
+    #controls-overlay {
+      position: absolute; bottom: 24px; right: 32px; display: none;
+      font-family: var(--mono); font-size: 11.5px; line-height: 1.9; letter-spacing: 1px;
+      color: var(--text); background: var(--panel); padding: 16px 20px;
+      border: 1px solid var(--line); border-radius: 4px;
+    }
+    #controls-overlay.visible { display: block; }
+    #controls-overlay .k { color: var(--cyan); display: inline-block; width: 110px; }
+
+    /* ---------- menus ---------- */
+    .screen {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      pointer-events: auto; background: radial-gradient(ellipse at 50% 40%, rgba(10, 16, 20, 0.62), rgba(5, 7, 9, 0.93));
+      transition: opacity 0.4s;
+    }
+    .screen.hidden { opacity: 0; pointer-events: none; }
+    .menu-box { text-align: center; max-width: 560px; padding: 30px; }
+
+    .game-title {
+      font-size: 72px; font-weight: 200; letter-spacing: 26px; color: #eef7fb;
+      text-indent: 26px; text-shadow: 0 0 36px rgba(60, 224, 255, 0.35);
+    }
+    .game-title em { font-style: normal; color: var(--cyan); font-weight: 400; }
+    .game-sub {
+      margin-top: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: 6px;
+      color: var(--dim); text-indent: 6px;
+    }
+    .menu-rule {
+      width: 320px; height: 1px; margin: 34px auto;
+      background: linear-gradient(90deg, transparent, var(--line) 20%, var(--line) 80%, transparent);
+    }
+    .menu-btns { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+    .mbtn {
+      width: 300px; padding: 12px 0; cursor: pointer;
+      font-family: var(--mono); font-size: 13px; letter-spacing: 5px; text-indent: 5px;
+      color: var(--text); background: rgba(20, 28, 34, 0.55);
+      border: 1px solid var(--line); border-radius: 3px;
+      transition: all 0.18s;
+    }
+    .mbtn:hover { background: rgba(40, 70, 86, 0.55); border-color: var(--cyan); color: #fff; box-shadow: 0 0 18px rgba(60, 224, 255, 0.2); }
+    .mbtn:disabled { opacity: 0.35; cursor: default; }
+    .mbtn:disabled:hover { background: rgba(20, 28, 34, 0.55); border-color: var(--line); color: var(--text); box-shadow: none; }
+    .mbtn.accent { border-color: rgba(255, 161, 60, 0.5); }
+    .mbtn.accent:hover { border-color: var(--amber); box-shadow: 0 0 18px rgba(255, 161, 60, 0.25); }
+
+    .menu-foot {
+      margin-top: 34px; font-family: var(--mono); font-size: 9.5px; letter-spacing: 2px;
+      color: rgba(110, 135, 145, 0.6); line-height: 1.9;
+    }
+
+    /* options */
+    .opt-row { display: flex; justify-content: space-between; align-items: center; width: 340px; margin: 14px auto; font-family: var(--mono); font-size: 12px; letter-spacing: 2px; }
+    .opt-row label { color: var(--text); }
+    .opt-row input[type="range"] { width: 150px; accent-color: var(--cyan); }
+    .opt-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--cyan); }
+    .opt-val { color: var(--cyan); width: 44px; text-align: right; }
+    .panel-title { font-family: var(--mono); font-size: 15px; letter-spacing: 8px; color: var(--cyan); margin-bottom: 24px; }
+
+    /* controls list inside menu */
+    .ctl-grid { font-family: var(--mono); font-size: 12px; letter-spacing: 1.5px; line-height: 2.2; text-align: left; width: 380px; margin: 0 auto; }
+    .ctl-grid .k { color: var(--cyan); display: inline-block; width: 140px; }
+
+    /* completion */
+    .complete-title { font-size: 38px; font-weight: 200; letter-spacing: 14px; color: #eef7fb; text-indent: 14px; }
+    .complete-sub { margin-top: 16px; font-family: var(--mono); font-size: 12px; letter-spacing: 4px; color: var(--cyan); }
+    .complete-body { margin-top: 26px; font-family: var(--mono); font-size: 11px; letter-spacing: 2px; color: var(--dim); line-height: 2; }
+
+    /* pause */
+    #pause-hint { font-family: var(--mono); font-size: 11px; letter-spacing: 3px; color: var(--dim); margin-top: 22px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

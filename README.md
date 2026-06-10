@@ -12,6 +12,8 @@
 
 <p><em>3× speed — <a href="media/demo.mp4">watch the full-quality video</a></em></p>
 
+<h3><a href="https://amsminn.github.io/null-gate/">▶ Play it in your browser</a></h3>
+
 </div>
 
 Null Gate is a first-person sci-fi portal puzzle game for the browser. It chains together interoperable, fully procedural systems — chambers, physics, apertures, audio — to recreate the feel of a sterile test facility: white panels that accept portals, dark plating that rejects them, weighted cubes on pressure nodes, and momentum flings where falling into a floor portal launches you horizontally out of a wall.
